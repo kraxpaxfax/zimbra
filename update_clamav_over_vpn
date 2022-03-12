@@ -1,0 +1,74 @@
+Автоматическое обновление антивирусных баз для Россиян
+
+Перед всеми манипуляциями делаем снапшот виртуальной машины или бэкап!!!
+Делаем бэкап антивирусных баз
+От пользователя zimbra
+
+mkdir -p /opt/zimbra/data/clamav/db/backup
+cp -a /opt/zimbra/data/clamav/db/*  /opt/zimbra/data/clamav/db/backup
+
+Проверяем что базы скопировались
+От пользователя zimbra
+ls -l /opt/zimbra/data/clamav/db/backup
+
+Файлы в каталоге /opt/zimbra/data/clamav/db/ должны совпадать с файлами в каталоге /opt/zimbra/data/clamav/db/backup
+
+########################################################
+Так как clamav принадлежит cisco а они заблокировали доступы из России то закачивать новые базы необходимо через vpn
+Самый простой и бесплатный а главное работающий vpn это tor
+
+Установим из консоли tor
+Установка tor не влияет на работу почтовой системы zimbra
+От пользователя root для rpm based distr (Centos / Oracle Linux /Red Hat)
+
+yum install tor
+
+Далее настроим конфиг
+От пользователя root
+
+vim /etc/tor/torrc
+
+Должны быть раскомментированы только следующие параметры:
+
+ControlSocket /run/tor/control
+ControlSocketsGroupWritable 1
+CookieAuthentication 0
+CookieAuthFile /run/tor/control.authcookie
+CookieAuthFileGroupReadable 0
+SOCKSPort localhost:9050
+DataDirectory /var/lib/tor
+ControlPort 9051
+
+Далее запустим сервис tor
+systemctl start tor
+
+Проверим что сервис работает
+systemctl status tor
+
+Проверим работу портов tor
+netstat -tnlp | grep '9050\|9051'
+
+От пользователя zimbra проверим что ip внешний поменялся при запросах в сервис tor
+torsocks curl 2ip.ru
+
+в выдаче получите tor ip - свой внешний вы знаете, полученый ip не должен совпадать с вашим
+
+Далее проверим что теперь можем закачивать свежие базы для clamav
+От пользователя zimbra
+
+torsocks /opt/zimbra/common/bin/freshclam --config-file=/opt/zimbra/conf/freshclam.conf
+
+Далее от пользователя root внесём обновление баз раз в сутки в cron задание
+
+vim /etc/crontab
+
+# Добавить строку в самом низу файла
+01 01 * * * zimbra /usr/bin/torsocks /opt/zimbra/common/bin/freshclam --config-file=/opt/zimbra/conf/freshclam.conf
+
+Каждый день в первую минуту в 1 час ночи будет загрузка новых антивирусных баз
+
+########################################################
+Мониторинг ошибок производить в файлах
+
+/opt/zimbra/log/freshclam.log
+/opt/zimbra/log/clamd.log
